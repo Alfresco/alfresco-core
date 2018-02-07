@@ -30,7 +30,7 @@ import org.hibernate.cfg.Configuration;
 import org.hibernate.cfg.Environment;
 import org.hibernate.dialect.Dialect;
 import org.springframework.beans.factory.FactoryBean;
-import org.springframework.orm.hibernate3.LocalSessionFactoryBean;
+import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
 
 /**
  * Factory for the Hibernate dialect. Allows dialect detection logic to be centralized and the dialect to be injected
