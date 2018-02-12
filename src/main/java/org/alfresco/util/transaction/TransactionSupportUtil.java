@@ -553,7 +553,46 @@ public abstract class TransactionSupportUtil
                 listener.beforeCompletion();
             }
         }
-               
+
+        @Override
+        public void afterCommit()
+        {
+            // Force any queries for read-write state to return TXN_READ_ONLY
+            // This will be cleared with the synchronization, so we don't need to clear it out
+            // TODO the transactional resources (Synchronisations) are not available after the transaction is finished (commit/rollback)
+            // It is required to come up with a different solution to maintain Shared Transactional Cache
+            TransactionSupportUtil.bindResource(RESOURCE_KEY_TXN_COMPLETING, Boolean.TRUE);
+
+            Set<Integer> priorities = priorityLookup.keySet();
+
+            SortedSet<Integer> sortedPriorities = new ConcurrentSkipListSet<Integer>(REVERSE_INTEGER_ORDER);
+            sortedPriorities.addAll(priorities);
+
+            // Need to run these in reverse order cache,lucene,listeners
+            for(Integer priority : sortedPriorities)
+            {
+                Set<TransactionListener> listeners = new HashSet<TransactionListener>(priorityLookup.get(priority));
+
+                for(TransactionListener listener : listeners)
+                {
+                    try
+                    {
+                        listener.afterCommit();
+                    }
+                    catch (RuntimeException e)
+                    {
+                        logger.error("After commit TransactionalCache exception", e);
+                    }
+                }
+            }
+            if(logger.isDebugEnabled())
+            {
+                logger.debug("After Commit: DONE");
+            }
+
+            // clear the thread's registrations and synchronizations
+            TransactionSupportUtil.clearSynchronization();
+        }
 
         @Override
         public void afterCompletion(int status)
@@ -573,30 +612,22 @@ public abstract class TransactionSupportUtil
             {
                 logger.debug("After completion (" + statusStr + "): " + this);
             }
-            
-            // Force any queries for read-write state to return TXN_READ_ONLY
-            // This will be cleared with the synchronization, so we don't need to clear it out
-            TransactionSupportUtil.bindResource(RESOURCE_KEY_TXN_COMPLETING, Boolean.TRUE);
-            
+
             Set<Integer> priorities = priorityLookup.keySet();
-        
+
             SortedSet<Integer> sortedPriorities = new ConcurrentSkipListSet<Integer>(REVERSE_INTEGER_ORDER);
             sortedPriorities.addAll(priorities);
-         
+
             // Need to run these in reverse order cache,lucene,listeners
             for(Integer priority : sortedPriorities)
             {
                 Set<TransactionListener> listeners = new HashSet<TransactionListener>(priorityLookup.get(priority));
 
-                for(TransactionListener listener : listeners) 
+                for(TransactionListener listener : listeners)
                 {
                     try
                     {
-                        if (status  == TransactionSynchronization.STATUS_COMMITTED)
-                        {
-                            listener.afterCommit();
-                        }
-                        else
+                        if (status != TransactionSynchronization.STATUS_COMMITTED)
                         {
                             listener.afterRollback();
                         }
@@ -611,8 +642,8 @@ public abstract class TransactionSupportUtil
             {
                 logger.debug("After Completion: DONE");
             }
-            
-            
+
+
             // clear the thread's registrations and synchronizations
             TransactionSupportUtil.clearSynchronization();
         }
