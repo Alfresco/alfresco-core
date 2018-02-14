@@ -222,9 +222,9 @@ public abstract class TransactionSupportUtil
     }
     
     /**
-     * Cleans out transaction resources if present
+     * Cleans out transaction synchronization and resources if required
      */
-    private static void clearSynchronization()
+    private static void clearSynchronization(boolean cleanResources)
     {
         if (TransactionSynchronizationManager.hasResource(RESOURCE_KEY_TXN_SYNCH))
         {
@@ -235,11 +235,14 @@ public abstract class TransactionSupportUtil
                 logger.debug("Unbound txn synch:" + txnSynch);
             }
         }
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        txnData.remove(TransactionSynchronizationManager.getCurrentTransactionName());
-        if (logger.isTraceEnabled())
+        if (cleanResources)
         {
-            logger.trace("Clear txn resource cache for " + TransactionSynchronizationManager.getCurrentTransactionName());
+            Map<String, Map<Object, Object>> txnData = txnResources.get();
+            txnData.remove(TransactionSynchronizationManager.getCurrentTransactionName());
+            if (logger.isTraceEnabled())
+            {
+                logger.trace("Clear txn resource cache for " + TransactionSynchronizationManager.getCurrentTransactionName());
+            }
         }
     }
     
@@ -468,7 +471,7 @@ public abstract class TransactionSupportUtil
             {
                 logger.debug("Suspending transaction: " + this);
             }
-            TransactionSupportUtil.clearSynchronization();
+            TransactionSupportUtil.clearSynchronization(false);
         }
 
         @Override
@@ -640,7 +643,7 @@ public abstract class TransactionSupportUtil
 
 
             // clear the thread's registrations and synchronizations
-            TransactionSupportUtil.clearSynchronization();
+            TransactionSupportUtil.clearSynchronization(true);
         }
     }
     
