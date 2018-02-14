@@ -150,7 +150,6 @@ public abstract class TransactionSupportUtil
         {
             registerSynchronizations();
         }
-//        Object resource = txnSynch.resources.get(key);
         Map<String, Map<Object, Object>> txnData = txnResources.get();
         String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
         Map<Object, Object> data = txnData.get(transactionName);
@@ -281,7 +280,6 @@ public abstract class TransactionSupportUtil
             txnData.put(transactionName, data);
         }
         data.put(key, resource);
-//        txnSynch.resources.put(key, resource);
         // done
         if (logger.isDebugEnabled())
         {
@@ -308,7 +306,6 @@ public abstract class TransactionSupportUtil
         String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
         Map<Object, Object> data = txnData.get(transactionName);
         data.remove(key);
-//        txnSynch.resources.remove(key);
         // done
         if (logger.isDebugEnabled())
         {
