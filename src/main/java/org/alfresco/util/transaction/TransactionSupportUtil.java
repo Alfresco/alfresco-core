@@ -572,6 +572,20 @@ public abstract class TransactionSupportUtil
         }
 
         @Override
+        public void beforeCompletion()
+        {
+            if (logger.isDebugEnabled())
+            {
+                logger.debug("Before completion: " + this);
+            }
+            // notify listeners
+            for (TransactionListener listener : getLevelZeroListenersIterable())
+            {
+                listener.beforeCompletion();
+            }
+        }
+
+        @Override
         public void afterCompletion(int status)
         {
             String statusStr = "unknown";
