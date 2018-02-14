@@ -29,6 +29,7 @@ import javax.transaction.SystemException;
 import javax.transaction.UserTransaction;
 
 import org.alfresco.error.StackTraceUtil;
+import org.alfresco.util.GUID;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.transaction.CannotCreateTransactionException;
@@ -212,11 +213,11 @@ public class SpringAwareUserTransaction
     }
     
     /**
-     * @see #NAME
+     * The name is randomised to bound threadlocal transactional resources
      */
     public String getName()
     {
-        return NAME;
+        return Thread.currentThread().getName() + "-" + GUID.generate();
     }
 
     public boolean isReadOnly()

@@ -62,7 +62,10 @@ public abstract class TransactionSupportUtil
     protected static final String RESOURCE_KEY_TXN_SYNCH = "txnSynch";
     /** resource binding during after-completion phase */
     protected static final String RESOURCE_KEY_TXN_COMPLETING = "AlfrescoTransactionSupport.txnCompleting";
-      
+    /** Transaction resources are held in thread local and accessible by transaction name, see {@link SpringAwareUserTransaction#getName()} */
+    private static final ThreadLocal<Map<String, Map<Object, Object>>> txnResources =
+            ThreadLocal.withInitial(() -> new HashMap<>(3));
+
     /**
      * @return Returns the system time when the transaction started, or -1 if there is no current transaction.
      */
@@ -143,14 +146,24 @@ public abstract class TransactionSupportUtil
     @SuppressWarnings("unchecked")
     public static <R extends Object> R getResource(Object key)
     {
-        // get the synchronization
-        TransactionSynchronizationImpl txnSynch = getSynchronization();
-        // get the resource
-        Object resource = txnSynch.resources.get(key);
+        if (TransactionSynchronizationManager.isSynchronizationActive())
+        {
+            registerSynchronizations();
+        }
+//        Object resource = txnSynch.resources.get(key);
+        Map<String, Map<Object, Object>> txnData = txnResources.get();
+        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
+        Map<Object, Object> data = txnData.get(transactionName);
+        Object resource = null;
+        if (data != null)
+        {
+            resource = data.get(key);
+        }
+
         // done
         if (logger.isTraceEnabled())
         {
-            logger.trace("Fetched resource: \n" +
+            logger.trace("Fetched resource from " + transactionName + ": \n" +
                     "   key: " + key + "\n" +
                     "   resource: " + resource);
         }
@@ -223,6 +236,12 @@ public abstract class TransactionSupportUtil
                 logger.debug("Unbound txn synch:" + txnSynch);
             }
         }
+        Map<String, Map<Object, Object>> txnData = txnResources.get();
+        txnData.remove(TransactionSynchronizationManager.getCurrentTransactionName());
+        if (logger.isTraceEnabled())
+        {
+            logger.trace("Clear txn resource cache for " + TransactionSynchronizationManager.getCurrentTransactionName());
+        }
     }
     
     /**
@@ -249,14 +268,24 @@ public abstract class TransactionSupportUtil
      */
     public static void bindResource(Object key, Object resource)
     {
-        // get the synchronization
-        TransactionSynchronizationImpl txnSynch = getSynchronization();
-        // bind the resource
-        txnSynch.resources.put(key, resource);
+        if (TransactionSynchronizationManager.isSynchronizationActive())
+        {
+            registerSynchronizations();
+        }
+        Map<String, Map<Object, Object>> txnData = txnResources.get();
+        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
+        Map<Object, Object> data = txnData.get(transactionName);
+        if (data == null)
+        {
+            data = new HashMap<>(3);
+            txnData.put(transactionName, data);
+        }
+        data.put(key, resource);
+//        txnSynch.resources.put(key, resource);
         // done
         if (logger.isDebugEnabled())
         {
-            logger.debug("Bound resource: \n" +
+            logger.debug("Bound resource to " + transactionName + ": \n" +
                     "   key: " + key + "\n" +
                     "   resource: " + resource);
         }
@@ -271,10 +300,15 @@ public abstract class TransactionSupportUtil
      */
     public static void unbindResource(Object key)
     {
-        // get the synchronization
-        TransactionSynchronizationImpl txnSynch = getSynchronization();
-        // remove the resource
-        txnSynch.resources.remove(key);
+        if (TransactionSynchronizationManager.isSynchronizationActive())
+        {
+            registerSynchronizations();
+        }
+        Map<String, Map<Object, Object>> txnData = txnResources.get();
+        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
+        Map<Object, Object> data = txnData.get(transactionName);
+        data.remove(key);
+//        txnSynch.resources.remove(key);
         // done
         if (logger.isDebugEnabled())
         {
@@ -539,60 +573,6 @@ public abstract class TransactionSupportUtil
                 doBeforeCommit(visitedListeners, readOnly);
             }
         }
-        
-        @Override
-        public void beforeCompletion()
-        {
-            if (logger.isDebugEnabled())
-            {
-                logger.debug("Before completion: " + this);
-            }
-            // notify listeners
-            for (TransactionListener listener : getLevelZeroListenersIterable())
-            {
-                listener.beforeCompletion();
-            }
-        }
-
-        @Override
-        public void afterCommit()
-        {
-            // Force any queries for read-write state to return TXN_READ_ONLY
-            // This will be cleared with the synchronization, so we don't need to clear it out
-            // TODO the transactional resources (Synchronisations) are not available after the transaction is finished (commit/rollback)
-            // It is required to come up with a different solution to maintain Shared Transactional Cache
-            TransactionSupportUtil.bindResource(RESOURCE_KEY_TXN_COMPLETING, Boolean.TRUE);
-
-            Set<Integer> priorities = priorityLookup.keySet();
-
-            SortedSet<Integer> sortedPriorities = new ConcurrentSkipListSet<Integer>(REVERSE_INTEGER_ORDER);
-            sortedPriorities.addAll(priorities);
-
-            // Need to run these in reverse order cache,lucene,listeners
-            for(Integer priority : sortedPriorities)
-            {
-                Set<TransactionListener> listeners = new HashSet<TransactionListener>(priorityLookup.get(priority));
-
-                for(TransactionListener listener : listeners)
-                {
-                    try
-                    {
-                        listener.afterCommit();
-                    }
-                    catch (RuntimeException e)
-                    {
-                        logger.error("After commit TransactionalCache exception", e);
-                    }
-                }
-            }
-            if(logger.isDebugEnabled())
-            {
-                logger.debug("After Commit: DONE");
-            }
-
-            // clear the thread's registrations and synchronizations
-            TransactionSupportUtil.clearSynchronization();
-        }
 
         @Override
         public void afterCompletion(int status)
@@ -627,7 +607,11 @@ public abstract class TransactionSupportUtil
                 {
                     try
                     {
-                        if (status != TransactionSynchronization.STATUS_COMMITTED)
+                        if (status  == TransactionSynchronization.STATUS_COMMITTED)
+                        {
+                            listener.afterCommit();
+                        }
+                        else
                         {
                             listener.afterRollback();
                         }
