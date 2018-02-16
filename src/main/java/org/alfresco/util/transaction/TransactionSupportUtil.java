@@ -209,8 +209,12 @@ public abstract class TransactionSupportUtil
      */
     private static void rebindSynchronization(TransactionSynchronizationImpl txnSynch)
     {
-        bindResource(RESOURCE_KEY_TXN_SYNCH, txnSynch);
-        bindResource(RESOURCE_KEY_TXN_ID, txnSynch.txnId);
+        // Register the resources, don't register the synchronisation
+        Map<String, Map<Object, Object>> txnData = txnResources.get();
+        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
+        Map<Object, Object> data = txnData.computeIfAbsent(transactionName, k -> new HashMap<>(3));
+        data.put(RESOURCE_KEY_TXN_SYNCH, txnSynch);
+        data.put(RESOURCE_KEY_TXN_ID, txnSynch.txnId);
         if (logger.isDebugEnabled())
         {
             logger.debug("Bound (rebind) txn synch: " + txnSynch);
