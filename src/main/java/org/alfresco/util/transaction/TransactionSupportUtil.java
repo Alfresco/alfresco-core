@@ -140,8 +140,6 @@ public abstract class TransactionSupportUtil
      *  
      * @param key the thread resource map key
      * @return Returns a thread resource of null if not present
-     * 
-     * @see org.alfresco.repo.transaction.TransactionalResourceHelper         for helper methods to create and bind common collection types
      */
     @SuppressWarnings("unchecked")
     public static <R extends Object> R getResource(Object key)
@@ -455,9 +453,6 @@ public abstract class TransactionSupportUtil
             return sb.toString();
         }
 
-        /**
-         * @see org.alfresco.repo.transaction.AlfrescoTransactionSupport#SESSION_SYNCHRONIZATION_ORDER
-         */
         @Override
         public int getOrder()
         {
