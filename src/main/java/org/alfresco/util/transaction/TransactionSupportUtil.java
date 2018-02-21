@@ -36,6 +36,8 @@ import org.alfresco.util.GUID;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.extensions.surf.util.ParameterCheck;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationAdapter;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -51,19 +53,26 @@ public abstract class TransactionSupportUtil
 {
     private static Log logger = LogFactory.getLog(TransactionSupportUtil.class);
     
-    /**
-     * The order of synchronization set to be 100 less than the Hibernate synchronization order
-     */
-    public static final int SESSION_SYNCHRONIZATION_ORDER = 800;
+    private static final int SESSION_SYNCHRONIZATION_ORDER = 800;
     /** resource key to store the transaction synchronizer instance */
-    protected static final String RESOURCE_KEY_TXN_SYNCH = "txnSynch";
+    private static final String RESOURCE_KEY_TXN_SYNCH = "AlfrescoTransactionSupport.txnSynch";
     /** resource key to store the transaction id, it needs to live even if the synchronization was cleared */
-    private static final String RESOURCE_KEY_TXN_ID = "txnId";
-    /** resource binding during after-completion phase */
-    protected static final String RESOURCE_KEY_TXN_COMPLETING = "AlfrescoTransactionSupport.txnCompleting";
-    /** Transaction resources are held in thread local and accessible by transaction name, see {@link SpringAwareUserTransaction#getName()} */
-    private static final ThreadLocal<Map<String, Map<Object, Object>>> txnResources =
-            ThreadLocal.withInitial(() -> new HashMap<>(3));
+    private static final String RESOURCE_KEY_TXN_ID = "AlfrescoTransactionSupport.txnId";
+    /** resource key to indicate after-completion phase */
+    private static final String RESOURCE_KEY_TXN_COMPLETED = "AlfrescoTransactionSupport.txnCompleted";
+    /**
+     *  <p>
+     *      As in Spring 5 the synchronisations are cleared after the transaction is committed or rolled back,
+     *      it is required to manage the txn resources in a separate thread local.
+     *      This is required to be able to use resources by afterCommit listeners.
+     *  </p>
+     *  <p>
+     *      If the transaction is suspended the resources are saved and restored afterwards.
+     *      See {@link TransactionSynchronizationImpl#suspend()} and {@link TransactionSynchronizationImpl#resume()}
+     *  </p>
+     */
+    private static final ThreadLocal<ResourcesHolder> txnResources =
+            ThreadLocal.withInitial(() -> new ResourcesHolder(new HashMap<>(3)));
 
     /**
      * @return Returns the system time when the transaction started, or -1 if there is no current transaction.
@@ -76,7 +85,7 @@ public abstract class TransactionSupportUtil
         if (TransactionSynchronizationManager.isSynchronizationActive())
         {
             // need to lazily register synchronizations
-            return registerSynchronization().getTransactionStartTime();
+            return TransactionSupportUtil.getSynchronization().getTransactionStartTime();
         }
         else
         {
@@ -115,21 +124,13 @@ public abstract class TransactionSupportUtil
     {
         if (TransactionSynchronizationManager.isSynchronizationActive())
         {
-            registerSynchronization();
+            TransactionSupportUtil.getSynchronization();
         }
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
-        Map<Object, Object> data = txnData.get(transactionName);
-        Object resource = null;
-        if (data != null)
-        {
-            resource = data.get(key);
-        }
-
-        // done
+        Object resource = txnResources.get().resources.get(key);
         if (logger.isTraceEnabled())
         {
-            logger.trace("Fetched resource from " + transactionName + ": \n" +
+            logger.trace("Fetched resource in " + TransactionSynchronizationManager.getCurrentTransactionName() +
+                    ": \n" +
                     "   key: " + key + "\n" +
                     "   resource: " + resource);
         }
@@ -137,90 +138,88 @@ public abstract class TransactionSupportUtil
     }
 
     /**
-     * Gets the current transaction synchronization instance
+     * Registers new transaction synchronization instance in {@link TransactionSynchronizationManager} and
+     * creates necessary resources, see {@link #txnResources}
      * 
-     * @return Returns the current or new synchronization implementation
+     * @return Returns new synchronization implementation
      */
     private static TransactionSynchronizationImpl registerSynchronization()
     {
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
-        Map<Object, Object> data = txnData.computeIfAbsent(transactionName, k -> new HashMap<>(3));
-        TransactionSynchronizationImpl txnSynch = (TransactionSynchronizationImpl) data.get(RESOURCE_KEY_TXN_SYNCH);
-        if (txnSynch != null)
+        if (!TransactionSynchronizationManager.isSynchronizationActive())
         {
-            // synchronization already registered
-            return txnSynch;
+            Thread currentThread = Thread.currentThread();
+            throw new AlfrescoRuntimeException("Transaction must be active and synchronization is required: " + currentThread);
+        }
+
+        // a unique ID for the transaction is required
+        String txnId = GUID.generate();
+        TransactionSynchronizationImpl txnSynch = new TransactionSynchronizationImpl(txnId);
+        TransactionSynchronizationManager.registerSynchronization(txnSynch);
+        // save the synchronization to ensure we don't duplicate it
+        // it might be required to create a nested resource holder
+        ResourcesHolder resourcesHolder = txnResources.get();
+        if (!resourcesHolder.resources.isEmpty())
+        {
+            ResourcesHolder newResourcesHolder = new ResourcesHolder(resourcesHolder, new HashMap<>(3));
+            txnResources.set(newResourcesHolder);
+        }
+        Map<Object, Object> data = txnResources.get().resources;
+        data.put(RESOURCE_KEY_TXN_SYNCH, txnSynch);
+        data.put(RESOURCE_KEY_TXN_ID, txnId);
+        // done
+        if (logger.isDebugEnabled())
+        {
+            logger.debug("Bound txn synch: " + txnSynch + " with txn name: "
+                    + TransactionSynchronizationManager.getCurrentTransactionName());
+        }
+        return txnSynch;
+    }
+
+    /**
+     * Gets the current transaction synchronization instance if the transaction was not completed
+     *
+     * @return Returns the current or new synchronization implementation
+     */
+    private static TransactionSynchronizationImpl getSynchronization()
+    {
+        Map<Object, Object> data = txnResources.get().resources;
+        if (data.get(TransactionSupportUtil.RESOURCE_KEY_TXN_COMPLETED) == null &&
+                data.get(RESOURCE_KEY_TXN_SYNCH) != null)
+        {
+            return (TransactionSynchronizationImpl) data.get(RESOURCE_KEY_TXN_SYNCH);
         }
         else
         {
-            if (!TransactionSynchronizationManager.isSynchronizationActive())
-            {
-                Thread currentThread = Thread.currentThread();
-                throw new AlfrescoRuntimeException("Transaction must be active and synchronization is required: " + currentThread);
-            }
-
-            // we need a unique ID for the transaction
-            String txnId = GUID.generate();
-            // register the synchronization
-            txnSynch = new TransactionSynchronizationImpl(txnId);
-            TransactionSynchronizationManager.registerSynchronization(txnSynch);
-            // save the resource that will ensure we don't duplicate the synchronization
-            data.put(RESOURCE_KEY_TXN_SYNCH, txnSynch);
-            data.put(RESOURCE_KEY_TXN_ID, txnId);
-            // done
-            if (logger.isDebugEnabled())
-            {
-                logger.debug("Bound txn synch: " + txnSynch);
-            }
-            return txnSynch;
+            return TransactionSupportUtil.registerSynchronization();
         }
     }
-    
-    /**
-     * Cleans thread local copy of transaction synchronization
-     */
-    private static void clearSynchronization()
+
+    private static void suspendSynchronization()
     {
-        unbindResource(RESOURCE_KEY_TXN_SYNCH);
-        if (logger.isDebugEnabled())
-        {
-            logger.debug("Unbound txn synch for " + TransactionSynchronizationManager.getCurrentTransactionName());
-        }
+        ResourcesHolder currentResourcesHolder = txnResources.get();
+        ResourcesHolder newResourcesHolder = new ResourcesHolder(currentResourcesHolder, new HashMap<>(3));
+        txnResources.set(newResourcesHolder);
     }
 
     /**
-     * Cleans all thread local transaction resources
+     * Cleans all thread local transaction resources. Restores parent transaction resources if necessary
      */
     private static void clearResources()
     {
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        txnData.remove(TransactionSynchronizationManager.getCurrentTransactionName());
-        if (logger.isTraceEnabled())
-        {
-            logger.trace("Clear txn resources for " + TransactionSynchronizationManager.getCurrentTransactionName());
-        }
-    }
-    
-    /**
-     * Helper method to rebind the synchronization to the transaction
-     *
-     * @param txnSynch TransactionSynchronizationImpl
-     */
-    private static void rebindSynchronization(TransactionSynchronizationImpl txnSynch)
-    {
-        // Register the resources, don't register the synchronisation
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
-        Map<Object, Object> data = txnData.computeIfAbsent(transactionName, k -> new HashMap<>(3));
-        data.put(RESOURCE_KEY_TXN_SYNCH, txnSynch);
-        data.put(RESOURCE_KEY_TXN_ID, txnSynch.txnId);
+        ResourcesHolder curreResourcesHolder = txnResources.get();
+        Map<Object, Object> txnData = curreResourcesHolder.resources;
+        txnData.clear();
         if (logger.isDebugEnabled())
         {
-            logger.debug("Bound (rebind) txn synch: " + txnSynch);
+            logger.debug("Clear txn resources for " + Thread.currentThread().getName());
+        }
+        ResourcesHolder previousResourcesHolder = curreResourcesHolder.previousResourceHolder;
+        if (previousResourcesHolder != null)
+        {
+            txnResources.set(previousResourcesHolder);
         }
     }
-    
+
     /**
      * Binds a resource to the current transaction
      * <p>
@@ -233,16 +232,13 @@ public abstract class TransactionSupportUtil
     {
         if (TransactionSynchronizationManager.isSynchronizationActive())
         {
-            registerSynchronization();
+            TransactionSupportUtil.getSynchronization();
         }
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
-        Map<Object, Object> data = txnData.computeIfAbsent(transactionName, k -> new HashMap<>(3));
-        data.put(key, resource);
+        txnResources.get().resources.put(key, resource);
         // done
-        if (logger.isDebugEnabled())
+        if (logger.isTraceEnabled())
         {
-            logger.debug("Bound resource to " + transactionName + ": \n" +
+            logger.trace("Bound resource to " + TransactionSynchronizationManager.getCurrentTransactionName() + ": \n" +
                     "   key: " + key + "\n" +
                     "   resource: " + resource);
         }
@@ -254,17 +250,11 @@ public abstract class TransactionSupportUtil
      */
     public static void unbindResource(Object key)
     {
-        Map<String, Map<Object, Object>> txnData = txnResources.get();
-        String transactionName = TransactionSynchronizationManager.getCurrentTransactionName();
-        Map<Object, Object> data = txnData.get(transactionName);
-        if (data != null)
+        txnResources.get().resources.remove(key);
+        if (logger.isTraceEnabled())
         {
-            data.remove(key);
-        }
-        // done
-        if (logger.isDebugEnabled())
-        {
-            logger.debug("Unbound resource: \n" +
+            logger.trace("Unbound resource from " + TransactionSynchronizationManager.getCurrentTransactionName()
+                    + ": \n" +
                     "   key: " + key);
         }
     }
@@ -284,7 +274,7 @@ public abstract class TransactionSupportUtil
         {
             logger.debug("Bind Listener listener: " + listener + ", priority: " + priority);
         }
-        TransactionSynchronizationImpl synch = registerSynchronization();
+        TransactionSynchronizationImpl synch = TransactionSupportUtil.getSynchronization();
         return synch.addListener(listener, priority);
     }
     
@@ -294,12 +284,38 @@ public abstract class TransactionSupportUtil
     public static Set<TransactionListener> getListeners()
     {
           // get the synchronization
-        TransactionSynchronizationImpl txnSynch = registerSynchronization();
+        TransactionSynchronizationImpl txnSynch = TransactionSupportUtil.getSynchronization();
       
         return txnSynch.getListenersIterable();
         
     }
-       
+
+    /**
+     * Resource holder to link all necessary resources for the current transaction.
+     * Also holds the resources for outer transactions.
+     * This is used by {@link TransactionSynchronizationImpl#suspend()}
+     * and {@link TransactionSynchronizationImpl#resume()}
+     *
+     */
+    private static class ResourcesHolder
+    {
+        @Nullable
+        private ResourcesHolder previousResourceHolder;
+        @NonNull
+        private Map<Object, Object> resources;
+
+        ResourcesHolder(ResourcesHolder previousResourceHolder, Map<Object, Object> resources)
+        {
+            this.previousResourceHolder = previousResourceHolder;
+            this.resources = resources;
+        }
+
+        ResourcesHolder(Map<Object, Object> resources)
+        {
+            this(null, resources);
+        }
+    }
+
     /**
      * Handler of txn synchronization callbacks specific to internal
      * application requirements
@@ -413,7 +429,7 @@ public abstract class TransactionSupportUtil
             {
                 logger.debug("Suspending transaction: " + this);
             }
-            TransactionSupportUtil.clearSynchronization();
+            TransactionSupportUtil.suspendSynchronization();
         }
 
         @Override
@@ -423,7 +439,6 @@ public abstract class TransactionSupportUtil
             {
                 logger.debug("Resuming transaction: " + this);
             }
-            TransactionSupportUtil.rebindSynchronization(this);
         }
 
         /**
@@ -532,10 +547,10 @@ public abstract class TransactionSupportUtil
         @Override
         public void afterCompletion(int status)
         {
-            // As in Spring 5 the synchronisations are clear after the transaction is committed or rolled back
-            // it is required to clean our copy of synchronization here
-            // If it is not done, this will break start up of new transaction in one of the listeners
-            clearSynchronization();
+            // As in Spring 5 the synchronisations are cleared after the transaction is committed or rolled back.
+            // It is required to mark the completion state, as it is enforces binding of
+            // new txn synchronization if one will be started in afterCommit/afterRollback listeners.
+            TransactionSupportUtil.bindResource(RESOURCE_KEY_TXN_COMPLETED, true);
 
             String statusStr = "unknown";
             switch (status)
@@ -587,7 +602,7 @@ public abstract class TransactionSupportUtil
                 logger.debug("After Completion: DONE");
             }
 
-            clearResources();
+            TransactionSupportUtil.clearResources();
         }
     }
     
