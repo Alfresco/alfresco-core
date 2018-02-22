@@ -58,8 +58,6 @@ public abstract class TransactionSupportUtil
     private static final String RESOURCE_KEY_TXN_SYNCH = "AlfrescoTransactionSupport.txnSynch";
     /** resource key to store the transaction id, it needs to live even if the synchronization was cleared */
     private static final String RESOURCE_KEY_TXN_ID = "AlfrescoTransactionSupport.txnId";
-    /** resource key to indicate after-completion phase */
-    private static final String RESOURCE_KEY_TXN_COMPLETED = "AlfrescoTransactionSupport.txnCompleted";
     /**
      *  <p>
      *      As in Spring 5 the synchronisations are cleared after the transaction is committed or rolled back,
@@ -183,8 +181,7 @@ public abstract class TransactionSupportUtil
     private static TransactionSynchronizationImpl getSynchronization()
     {
         Map<Object, Object> data = txnResources.get().resources;
-        if (data.get(TransactionSupportUtil.RESOURCE_KEY_TXN_COMPLETED) == null &&
-                data.get(RESOURCE_KEY_TXN_SYNCH) != null)
+        if (data.get(RESOURCE_KEY_TXN_SYNCH) != null)
         {
             return (TransactionSynchronizationImpl) data.get(RESOURCE_KEY_TXN_SYNCH);
         }
@@ -194,11 +191,29 @@ public abstract class TransactionSupportUtil
         }
     }
 
+    /**
+     * Saves resources and creates a new empty resource holder
+     */
     private static void suspendSynchronization()
     {
         ResourcesHolder currentResourcesHolder = txnResources.get();
         ResourcesHolder newResourcesHolder = new ResourcesHolder(currentResourcesHolder, new HashMap<>(3));
         txnResources.set(newResourcesHolder);
+    }
+
+    /**
+     * Cleans up the resource holder if it is empty. This is required when transaction was suspended
+     * but none of application transactions were started before it was resumed.
+     */
+    private static void resumeSynchronization()
+    {
+        ResourcesHolder currentResourcesHolder = txnResources.get();
+        ResourcesHolder previousResourcesHolder = currentResourcesHolder.previousResourceHolder;
+        if (currentResourcesHolder.resources.isEmpty() &&
+                previousResourcesHolder != null)
+        {
+            txnResources.set(previousResourcesHolder);
+        }
     }
 
     /**
@@ -439,6 +454,7 @@ public abstract class TransactionSupportUtil
             {
                 logger.debug("Resuming transaction: " + this);
             }
+            TransactionSupportUtil.resumeSynchronization();
         }
 
         /**
@@ -548,9 +564,9 @@ public abstract class TransactionSupportUtil
         public void afterCompletion(int status)
         {
             // As in Spring 5 the synchronisations are cleared after the transaction is committed or rolled back.
-            // It is required to mark the completion state, as it is enforces binding of
+            // It is required to remove synchronization, as it is enforces binding of
             // new txn synchronization if one will be started in afterCommit/afterRollback listeners.
-            TransactionSupportUtil.bindResource(RESOURCE_KEY_TXN_COMPLETED, true);
+            TransactionSupportUtil.unbindResource(RESOURCE_KEY_TXN_SYNCH);
 
             String statusStr = "unknown";
             switch (status)
