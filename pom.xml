@@ -33,7 +33,7 @@
       <dependency.spring.version>3.2.16.RELEASE</dependency.spring.version>
       <dependency.surf.version>6.8</dependency.surf.version>
 
-      <java.compiler.version>1.8</java.compiler.version>
+      <java.compiler.version>1.7</java.compiler.version>
    </properties>
 
    <dependencies>
