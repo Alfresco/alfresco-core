@@ -32,8 +32,10 @@
    <properties>
       <dependency.spring.version>3.2.14.RELEASE</dependency.spring.version>
       <dependency.surf.version>6.0</dependency.surf.version>
+
+      <java.compiler.version>1.7</java.compiler.version>
    </properties>
-   
+
    <dependencies>
       <dependency>
          <groupId>commons-codec</groupId>
@@ -219,6 +221,15 @@
                </execution>
             </executions>
          </plugin>
+          <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-compiler-plugin</artifactId>
+              <version>3.6.0</version>
+              <configuration>
+                  <source>${java.compiler.version}</source>
+                  <target>${java.compiler.version}</target>
+              </configuration>
+          </plugin>
       </plugins>
    </build>
 
