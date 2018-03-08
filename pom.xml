@@ -1,32 +1,23 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
    <modelVersion>4.0.0</modelVersion>
 
-   <groupId>org.alfresco</groupId>
+   <parent>   
+      <groupId>org.alfresco</groupId>
+      <artifactId>alfresco-super-pom</artifactId>
+      <version>9</version>
+   </parent>   
    <artifactId>alfresco-core</artifactId>
-   <version>6.1.2.3-SNAPSHOT</version>
+   <version>6.1.2-SNAPSHOT</version>
    <name>Alfresco Core</name>
    <description>Alfresco core libraries and utils</description>
-   
-   <url>http://www.alfresco.org/</url>
-   <inceptionYear>2005</inceptionYear>
-   <organization>
-      <name>Alfresco Software</name>
-      <url>http://www.alfresco.org/</url>
-   </organization>
-   <licenses>
-      <license>
-         <name>GNU Lesser General Public License v3.0 or later</name>
-         <url>http://www.gnu.org/licenses/lgpl-3.0-standalone.html</url>
-      </license>
-   </licenses>
+
    <scm>
-      <connection>scm:svn:https://svn.alfresco.com/repos/alfresco-open-mirror/services/alfresco-core/branches/6.1.2</connection>
-      <developerConnection>scm:svn:https://svn.alfresco.com/repos/alfresco-enterprise/services/alfresco-core/branches/6.1.2</developerConnection>
-   </scm>
-   <prerequisites>
-     <maven>3.0.3</maven>
-   </prerequisites>
-   
+      <connection>scm:git:https://github.com/Alfresco/alfresco-core.git</connection>
+      <developerConnection>scm:git:https://github.com/Alfresco/alfresco-core.git</developerConnection>
+      <url>https://github.com/Alfresco/alfresco-core</url>
+     <tag>HEAD</tag>
+  </scm>
+
    <distributionManagement>
       <repository>
           <id>alfresco-internal</id>
@@ -35,15 +26,12 @@
       <snapshotRepository>
           <id>alfresco-internal-snapshots</id>
           <url>https://artifacts.alfresco.com/nexus/content/repositories/snapshots</url>
-      </snapshotRepository>      
+      </snapshotRepository>
    </distributionManagement>
    
    <properties>
-      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-      <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-      
       <dependency.spring.version>3.2.14.RELEASE</dependency.spring.version>
-      <dependency.webscripts.version>6.0</dependency.webscripts.version>
+      <dependency.surf.version>6.0</dependency.surf.version>
    </properties>
    
    <dependencies>
@@ -127,7 +115,7 @@
       <dependency>
          <groupId>org.alfresco.surf</groupId>
          <artifactId>spring-surf-core-configservice</artifactId>
-         <version>${dependency.webscripts.version}</version>
+         <version>${dependency.surf.version}</version>
       </dependency>
       <dependency>
          <groupId>com.sun.xml.bind</groupId>
@@ -207,42 +195,10 @@
    </dependencies>
 
    <build>
-      <!-- Defining version and some configuration of Maven plugins -->
       <pluginManagement>
          <plugins>
             <plugin>
-               <artifactId>maven-clean-plugin</artifactId>
-               <version>2.6.1</version>
-            </plugin>
-            <plugin>
-               <artifactId>maven-compiler-plugin</artifactId>
-               <version>3.3</version>
-               <configuration>
-                  <source>1.7</source>
-                  <target>1.7</target>
-               </configuration>
-            </plugin>
-            <plugin>
-               <artifactId>maven-deploy-plugin</artifactId>
-               <version>2.8.2</version>
-            </plugin>
-            <plugin>
-               <artifactId>maven-surefire-plugin</artifactId>
-               <version>2.18.1</version>
-               <configuration>
-                  <!-- To prevent tests alfresco.log to be created in project roots and bother while synchronizing with SCM -->
-                  <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                  <runOrder>alphabetical</runOrder>
-               </configuration>
-            </plugin>
-            <plugin>
-               <groupId>org.codehaus.mojo</groupId>
-               <artifactId>properties-maven-plugin</artifactId>
-               <version>1.0-alpha-2</version>
-            </plugin>
-            <plugin>
                <artifactId>maven-release-plugin</artifactId>
-               <version>2.5.2</version>
                <configuration>
                   <autoVersionSubmodules>true</autoVersionSubmodules>
                   <tagNameFormat>@{project.version}</tagNameFormat>
