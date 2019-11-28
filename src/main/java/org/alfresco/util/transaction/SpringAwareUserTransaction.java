@@ -411,7 +411,7 @@ public class SpringAwareUserTransaction
         try
         {
             internalTxnInfo = createTransactionIfNecessary(
-                getTransactionManager(), getTransactionAttribute(null, null), getName());
+                    (PlatformTransactionManager) getTransactionManager(), getTransactionAttribute(null, null), getName());
         }
         catch (CannotCreateTransactionException e)
         {
