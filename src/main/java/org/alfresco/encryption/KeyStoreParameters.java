@@ -18,7 +18,6 @@
  */
 package org.alfresco.encryption;
 
-import java.util.Set;
 import org.alfresco.util.PropertyCheck;
 
 /**
