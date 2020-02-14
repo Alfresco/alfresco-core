@@ -33,6 +33,7 @@ import javax.net.ssl.TrustManager;
 public interface AlfrescoKeyStore
 {
     public static final String KEY_KEYSTORE_PASSWORD = "keystore.password";
+    public static final String KEY_KEYSTORE_ALIASES = "keystore.aliases";
 
     /**
      * The name of the keystore.
