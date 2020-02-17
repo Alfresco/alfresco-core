@@ -65,14 +65,25 @@ public class KeyStoreParameters
     public KeyStoreParameters(String id, String name, String type, String keyStoreProvider,
             String keyMetaDataFileLocation, String location)
     {
-        super();
+        this(name, type, keyStoreProvider, keyMetaDataFileLocation, location);
         this.id = id;
+    }
+
+    /**
+     * Use {@link #KeyStoreParameters(String, String, String, String, String, String)} instead
+     */
+    @Deprecated()
+    public KeyStoreParameters(String name, String type, String keyStoreProvider,
+                              String keyMetaDataFileLocation, String location)
+    {
+        super();
         this.name = name;
         this.type = type;
         this.provider = keyStoreProvider;
         this.keyMetaDataFileLocation = keyMetaDataFileLocation;
         this.location = location;
     }
+
 
     public void init()
     {
