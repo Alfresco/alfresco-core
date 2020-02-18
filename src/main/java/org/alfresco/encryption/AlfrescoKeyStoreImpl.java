@@ -1043,17 +1043,19 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
                 Properties jvmProperties = System.getProperties();
                 keyStorePassword = jvmProperties.getProperty(keyStoreParameters.getId() + ".password");
                 String aliases = jvmProperties.getProperty(keyStoreParameters.getId() + ".aliases");
-                if(aliases == null)
+                if (aliases == null || aliases.isEmpty())
                 {
-                    throw new AlfrescoRuntimeException("Aliases must be specified for " + keyStoreParameters.getId()
+                    logger.warn("No aliases were be specified for " + keyStoreParameters.getId()
                             + " keystore");
                 }
-
-                StringTokenizer st = new StringTokenizer(aliases, ",");
-                while(st.hasMoreTokens())
+                else
                 {
-                    String keyAlias = st.nextToken();
-                    keyInfo.put(keyAlias, loadKeyInformation(jvmProperties, keyAlias, keyStoreParameters.getId() + "."));
+                    StringTokenizer st = new StringTokenizer(aliases, ",");
+                    while(st.hasMoreTokens())
+                    {
+                        String keyAlias = st.nextToken();
+                        keyInfo.put(keyAlias, loadKeyInformation(jvmProperties, keyAlias, keyStoreParameters.getId() + "."));
+                    }
                 }
             }
             else

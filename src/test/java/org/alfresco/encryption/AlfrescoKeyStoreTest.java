@@ -45,17 +45,28 @@ public class AlfrescoKeyStoreTest
         System.setProperty(keyStoreId + "." + alias1 + "." + "password", "aliasPwd1");
         System.setProperty(keyStoreId + "." + alias2 + "." + "password", "aliasPwd2");
 
-        AlfrescoKeyStore alfrescoKeyStore = new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
-        Set<String> expectedAliases = new HashSet<>();
-        expectedAliases.add(alias1);
-        expectedAliases.add(alias2);
-        Assert.assertEquals("The aliases are not correct", expectedAliases, alfrescoKeyStore.getKeyAliases());
+        try
+        {
+            AlfrescoKeyStore alfrescoKeyStore = new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
+            Set<String> expectedAliases = new HashSet<>();
+            expectedAliases.add(alias1);
+            expectedAliases.add(alias2);
+            Assert.assertEquals("The aliases are not correct", expectedAliases, alfrescoKeyStore.getKeyAliases());
 
-        Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias1));
-        Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias2));
+            Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias1));
+            Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias2));
+        }
+        finally
+        {
+            System.clearProperty(keyStoreId + "." + "password");
+            System.clearProperty(keyStoreId + "." + "aliases");
+            System.clearProperty(keyStoreId + "." + alias1 + "." + "password");
+            System.clearProperty(keyStoreId + "." + alias2 + "." + "password");
+        }
+
     }
 
-    @Test(expected = AlfrescoRuntimeException.class)
+    @Test
     public void testSysPropConfigWithoutAliases()
     {
         String keyStoreId = "testSysPropConfigWithoutAliases-keystore";
@@ -68,12 +79,48 @@ public class AlfrescoKeyStoreTest
         keyStoreParameters.setProvider("SunJCE");
         keyStoreParameters.setLocation("classpath:keystore-tests/ks-test-1.jks");
 
+        System.setProperty(keyStoreId + "." + "password", "ksPwd1");
+        System.setProperty(keyStoreId + "." + alias1 + "." + "password", "aliasPwd1");
+        try
+        {
+            AlfrescoKeyStore keyStore = new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
+            Assert.assertNull(keyStore.getKey(alias1));
+        }
+        finally
+        {
+            System.clearProperty(keyStoreId + "." + "password");
+            System.clearProperty(keyStoreId + "." + alias1 + "." + "password");
+        }
+    }
+
+    @Test(expected = AlfrescoRuntimeException.class)
+    public void testSysPropConfigWrongPassword()
+    {
+        String keyStoreId = "testSysPropConfigWrongPassword-keystore";
+        String alias1 = "mykey1";
+
+        KeyStoreParameters keyStoreParameters = new KeyStoreParameters();
+        keyStoreParameters.setId(keyStoreId);
+        keyStoreParameters.setName("testSysPropConfigWrongPassword");
+        keyStoreParameters.setType("JCEKS");
+        keyStoreParameters.setProvider("SunJCE");
+        keyStoreParameters.setLocation("classpath:keystore-tests/ks-test-1.jks");
+
+        System.setProperty(keyStoreId + "." + "aliases", alias1);
         System.setProperty(keyStoreId + "." + "password", "ksPwd2");
         System.setProperty(keyStoreId + "." + alias1 + "." + "password", "aliasPwd1");
 
-        new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
+        try
+        {
+            new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
+        }
+        finally
+        {
+            System.clearProperty(keyStoreId + "." + "aliases");
+            System.clearProperty(keyStoreId + "." + "password");
+            System.clearProperty(keyStoreId + "." + alias1 + "." + "password");
+        }
     }
-
 
     @Test
     public void testMetaDataFileConfig()
@@ -101,13 +148,13 @@ public class AlfrescoKeyStoreTest
     @Test
     public void testConfigBothSystemAndFile()
     {
-        String keyStoreId = "testSysPropsConfig-keystore";
+        String keyStoreId = "testConfigBothSystemAndFile-keystore";
         String alias1 = "mykey1";
         String alias2 = "mykey2";
 
         KeyStoreParameters keyStoreParameters = new KeyStoreParameters();
         keyStoreParameters.setId(keyStoreId);
-        keyStoreParameters.setName("testSysPropsConfig");
+        keyStoreParameters.setName("testConfigBothSystemAndFile");
         keyStoreParameters.setType("JCEKS");
         keyStoreParameters.setProvider("SunJCE");
         keyStoreParameters.setLocation("classpath:keystore-tests/ks-test-2.jks");
@@ -119,13 +166,43 @@ public class AlfrescoKeyStoreTest
         System.setProperty(keyStoreId + "." + alias1 + "." + "password", "aliasPwd1");
         System.setProperty(keyStoreId + "." + alias2 + "." + "password", "aliasPwd2");
 
-        AlfrescoKeyStore alfrescoKeyStore = new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
-        Set<String> expectedAliases = new HashSet<>();
-        expectedAliases.add(alias1);
-        expectedAliases.add(alias2);
-        Assert.assertEquals("The aliases are not correct", expectedAliases, alfrescoKeyStore.getKeyAliases());
+        try
+        {
+            AlfrescoKeyStore alfrescoKeyStore = new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
+            Set<String> expectedAliases = new HashSet<>();
+            expectedAliases.add(alias1);
+            expectedAliases.add(alias2);
+            Assert.assertEquals("The aliases are not correct", expectedAliases, alfrescoKeyStore.getKeyAliases());
 
-        Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias1));
-        Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias2));
+            Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias1));
+            Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias2));
+        }
+        finally
+        {
+            System.clearProperty(keyStoreId + "." + "password");
+            System.clearProperty(keyStoreId + "." + "aliases");
+            System.clearProperty(keyStoreId + "." + alias1 + "." + "password");
+            System.clearProperty(keyStoreId + "." + alias2 + "." + "password");
+        }
+
+    }
+
+
+    /**
+     * No exception is expected. An empty keystore can be created.
+     */
+    @Test
+    public void testConfigEmptyKeystore()
+    {
+        String keyStoreId = "testConfigEmptyKeystore-keystore";
+
+        KeyStoreParameters keyStoreParameters = new KeyStoreParameters();
+        keyStoreParameters.setId(keyStoreId);
+        keyStoreParameters.setName("testConfigEmptyKeystore");
+        keyStoreParameters.setType("JCEKS");
+        keyStoreParameters.setProvider("SunJCE");
+        keyStoreParameters.setLocation("classpath:non-existing-path/some-keystore.jks");
+
+        new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
     }
 }
