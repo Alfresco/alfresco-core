@@ -1045,7 +1045,7 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
                 String aliases = jvmProperties.getProperty(keyStoreParameters.getId() + ".aliases");
                 if (aliases == null || aliases.isEmpty())
                 {
-                    logger.warn("No aliases were be specified for " + keyStoreParameters.getId()
+                    logger.warn("No aliases were specified for " + keyStoreParameters.getId()
                             + " keystore");
                 }
                 else
