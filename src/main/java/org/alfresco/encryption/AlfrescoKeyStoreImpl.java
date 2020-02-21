@@ -760,8 +760,13 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
         }
     }
 
-    protected Key getSecretKey(KeyInformation keyInformation) throws NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException
+    protected Key getSecretKey(KeyInformation keyInformation) throws AlfrescoRuntimeException, NoSuchAlgorithmException, InvalidKeyException, InvalidKeySpecException
     {
+        if (keyInformation == null)
+        {
+            throw new AlfrescoRuntimeException("Unable to get secret key: no key information is provided");
+        }
+
         byte[] keyData = keyInformation.getKeyData();
 
         if(keyData == null)
@@ -1036,8 +1041,6 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
          */
         protected void loadKeyMetaData() throws IOException, FileNotFoundException
         {
-            boolean isFileConfig = false;
-
             if (keyStoreParameters.getId() != null)
             {
                 Properties jvmProperties = System.getProperties();
