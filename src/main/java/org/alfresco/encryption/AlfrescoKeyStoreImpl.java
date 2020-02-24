@@ -1028,7 +1028,8 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
          *
          * WARNING. Storing passwords (keyMetaDataFileLocation) on the file system is not following best security practices.
          *
-         * <p/>Set the unique ID of the keystore to use JVM properties lookup instead. The property lookup format is:
+         * <p/>Loading of keys info from system (JVM) properties takes precedence over metadata file.
+         * <p/>Set the unique ID of the keystore and remove the metadata file location property to use JVM properties lookup instead. The property lookup format is the following:
          * <ul>
          *     <li>[keystore-id].password - keystore password</li>
          *     <li>[keystore-id].aliases - comma separated list of aliases for the keys in the keystore</li>
@@ -1037,11 +1038,12 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
          *     <li>[keystore-id].[alias].password - key password</li>
          * </ul>
          *
-         * Loading of keys info from system (JVM) properties takes precedence over metadata file.
          */
         protected void loadKeyMetaData() throws IOException, FileNotFoundException
         {
-            if (keyStoreParameters.getId() != null)
+            if (keyStoreParameters.getId() != null &&
+                    (keyStoreParameters.getKeyMetaDataFileLocation() == null ||
+                            keyStoreParameters.getKeyMetaDataFileLocation().isEmpty()))
             {
                 Properties jvmProperties = System.getProperties();
                 keyStorePassword = jvmProperties.getProperty(keyStoreParameters.getId() + ".password");

@@ -127,9 +127,10 @@ public class AlfrescoKeyStoreTest
     }
 
     /**
-     * Config via System props should take precedence
+     * Config via System props should be default, but if the metadata file location is set, it will be used instead.
+     * This is done to maintain backwards compatibility and simplify testing use cases.
      */
-    @Test
+    @Test(expected = AlfrescoRuntimeException.class)
     public void testConfigBothSystemAndFile()
     {
         String keyStoreId = testName.getMethodName() + "-keystore";
@@ -152,14 +153,7 @@ public class AlfrescoKeyStoreTest
 
         try
         {
-            AlfrescoKeyStore alfrescoKeyStore = new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
-            Set<String> expectedAliases = new HashSet<>();
-            expectedAliases.add(alias1);
-            expectedAliases.add(alias2);
-            Assert.assertEquals("The aliases are not correct", expectedAliases, alfrescoKeyStore.getKeyAliases());
-
-            Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias1));
-            Assert.assertNotNull("Failed to retrieve a key from keystore.", alfrescoKeyStore.getKey(alias2));
+            new AlfrescoKeyStoreImpl(keyStoreParameters, new SpringKeyResourceLoader());
         }
         finally
         {
