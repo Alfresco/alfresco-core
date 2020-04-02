@@ -391,8 +391,16 @@ public class AlfrescoKeyStoreImpl implements AlfrescoKeyStore
         return new FileOutputStream(getKeyStoreParameters().getLocation());
     }
     
-    protected KeyInfoManager getKeyInfoManager(KeyStoreParameters keyStoreParameters) throws FileNotFoundException, IOException
+    protected KeyInfoManager getKeyInfoManager(KeyStoreParameters keyStoreParameters) throws IOException
     {
+        return new KeyInfoManager(keyStoreParameters, keyResourceLoader);
+    }
+
+    @Deprecated
+    protected KeyInfoManager getKeyInfoManager(String metadataFileLocation) throws IOException
+    {
+        KeyStoreParameters keyStoreParameters = new KeyStoreParameters();
+        keyStoreParameters.setKeyMetaDataFileLocation(metadataFileLocation);
         return new KeyInfoManager(keyStoreParameters, keyResourceLoader);
     }
 
