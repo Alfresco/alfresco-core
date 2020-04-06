@@ -4,10 +4,10 @@
    <parent>   
       <groupId>org.alfresco</groupId>
       <artifactId>alfresco-super-pom</artifactId>
-      <version>10</version>
+      <version>12</version>
    </parent>   
    <artifactId>alfresco-core</artifactId>
-   <version>8.28-SNAPSHOT</version>
+      <version>8.28-SNAPSHOT</version>
    <name>Alfresco Core</name>
    <description>Alfresco core libraries and utils</description>
 
