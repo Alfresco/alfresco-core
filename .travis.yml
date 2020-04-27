@@ -12,6 +12,7 @@ branches:
   only:
     - master
     - /support\/.*/
+    - fix/ACS-78
 
 install: travis_retry mvn install -DskipTests=true -B -V
 
@@ -40,7 +41,7 @@ jobs:
         srcclr: true
     - stage: release
       name: "Push to Nexus"
-      if: fork = false AND (branch = master OR branch =~ /support\/.*/) AND type != pull_request AND commit_message !~ /\[no-release\]/
+      if: fork = false AND (branch = master OR branch =~ /support\/.*/ OR branch = fix/ACS-78) AND type != pull_request AND commit_message !~ /\[no-release\]/
       before_install:
         - "cp .travis.settings.xml $HOME/.m2/settings.xml"
       script:
@@ -49,4 +50,4 @@ jobs:
         # Add email to link commits to user
         - git config user.email "${GIT_EMAIL}"
         # Skip building of release commits
-        - mvn --batch-mode -q -DscmCommentPrefix="[maven-release-plugin][skip ci] " -Dusername="${GIT_USERNAME}" -Dpassword="${GIT_PASSWORD}" -DskipTests -Darguments=-DskipTests release:clean release:prepare release:perform
+        - mvn --batch-mode -q -DscmCommentPrefix="[maven-release-plugin][skip ci] " -Dusername="${GIT_USERNAME}" -Dpassword="${GIT_PASSWORD}" -DskipTests -Darguments=-DskipTests -DreleaseVersion=ACS-78 -DdevelopmentVersion=7.32-SNAPSHOT release:clean release:prepare release:perform
