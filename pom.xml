@@ -7,7 +7,7 @@
       <version>12</version>
    </parent>   
    <artifactId>alfresco-core</artifactId>
-   <version>8.50-SNAPSHOT</version>
+   <version>mnt-21879-1-SNAPSHOT</version>
    <name>Alfresco Core</name>
    <description>Alfresco core libraries and utils</description>
 
